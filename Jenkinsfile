@@ -2,7 +2,7 @@ pipeline {
     agent any
     
     environment {
-        DOCKER_IMAGE = 'saadsokkary/custom-nginx'
+        DOCKER_IMAGE = 'saadsokkary/jenkins-nginx'
         IMAGE_TAG = "v${BUILD_NUMBER}"
         EC2_HOST = '54.152.50.94'
         EC2_USER = 'ubuntu'
