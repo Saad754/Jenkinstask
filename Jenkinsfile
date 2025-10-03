@@ -23,9 +23,10 @@ pipeline {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
-                        sh 'docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD'
+                        sh 'echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin'
                         sh "docker push ${DOCKER_IMAGE}:${IMAGE_TAG}"
                         sh "docker push ${DOCKER_IMAGE}:latest"
+                        sh 'docker logout'
                     }
                 }
             }
@@ -34,15 +35,19 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    sshagent(['ec2-ssh-key']) {
-                        sh """
-                            ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
-                                docker pull ${DOCKER_IMAGE}:${IMAGE_TAG}
-                                docker stop ${CONTAINER_NAME} || true
-                                docker rm ${CONTAINER_NAME} || true
-                                docker run -d --name ${CONTAINER_NAME} -p 80:80 ${DOCKER_IMAGE}:${IMAGE_TAG}
-                            '
-                        """
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                        sshagent(['ec2-ssh-key']) {
+                            sh """
+                                ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
+                                    echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
+                                    docker pull ${DOCKER_IMAGE}:${IMAGE_TAG}
+                                    docker stop ${CONTAINER_NAME} || true
+                                    docker rm ${CONTAINER_NAME} || true
+                                    docker run -d --name ${CONTAINER_NAME} -p 80:80 ${DOCKER_IMAGE}:${IMAGE_TAG}
+                                    docker logout
+                                '
+                            """
+                        }
                     }
                 }
             }
